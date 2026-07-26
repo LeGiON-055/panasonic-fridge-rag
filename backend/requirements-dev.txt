@@ -1,0 +1,4 @@
+# Only needed if you run data/generate_sample_manual.py (an optional utility
+# that creates a placeholder manual so you can test the pipeline before you
+# have real manual PDFs). Not required to run the actual API.
+reportlab==4.4.10

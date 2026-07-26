@@ -1,0 +1,23 @@
+# Render Blueprint — https://render.com/docs/infrastructure-as-code
+#
+# Usage: push this repo to GitHub, then in the Render dashboard choose
+# "New +" -> "Blueprint" and point it at the repo. Render reads this file
+# and provisions the service below. You'll be prompted to paste in
+# GEMINI_API_KEY (kept out of this file on purpose — see backend/.env.example).
+#
+# The free plan spins the service down after ~15 min of inactivity and takes
+# roughly 30-60s to wake back up on the next request. Fine for a demo/case
+# study; upgrade the plan for anything closer to production.
+services:
+  - type: web
+    name: fridge-manual-rag-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: "*"   # tighten to your deployed frontend's origin once you have it

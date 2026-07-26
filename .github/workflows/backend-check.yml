@@ -1,0 +1,36 @@
+name: Backend sanity check
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-check.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+
+jobs:
+  import-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Byte-compile (catches syntax errors)
+        run: python -m py_compile app/*.py
+
+      - name: Import check
+        run: |
+          python -c "
+          from app import config, schemas, pdf_utils, image_utils, embeddings, vectorstore, rag, main, ingest
+          print('All modules imported cleanly.')
+          "

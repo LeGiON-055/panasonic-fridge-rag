@@ -1,0 +1,29 @@
+# Secrets
+.env
+backend/.env
+
+# Generated vector index and extracted images (rebuild with `python -m app.ingest`)
+backend/vectorstore/
+backend/data/manual_images/
+
+# Manual PDFs are usually copyrighted by the manufacturer — this repo ships
+# the pipeline, not the manuals. Add your own to backend/data/manuals/
+# (see README) and they'll stay local instead of getting committed.
+backend/data/manuals/*.pdf
+!backend/data/manuals/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# OS/editor cruft
+.DS_Store
+.vscode/
+.idea/
+
+# Antigravity / agent workspace state (local to your machine)
+.agent/
+.antigravity/
