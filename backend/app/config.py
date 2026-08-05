@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent  # backend/
 # --- Gemini API ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
-GENERATION_MODEL = os.getenv("GENERATION_MODEL", "gemini-2.5-flash")
+GENERATION_MODEL = os.getenv("GENERATION_MODEL", "gemini-flash-latest")
 
 # --- Storage ---
 MANUALS_DIR = Path(os.getenv("MANUALS_DIR", BASE_DIR / "data" / "manuals"))

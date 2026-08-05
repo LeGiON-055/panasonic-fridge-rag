@@ -42,5 +42,9 @@ def ask(request: AskRequest) -> AskResponse:
     try:
         return answer_question(request.question, model_filter=request.model_filter)
     except RuntimeError as e:
-        # Missing/invalid API key etc. — surface as a clean 500, not a stack trace.
         raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        # Catches Gemini API errors (bad model name, quota, etc.) so the
+        # frontend gets a real error message instead of a raw 500 that
+        # CORS then hides behind a fake "can't reach backend" message.
+        raise HTTPException(status_code=500, detail=f"Gemini API error: {e}")
