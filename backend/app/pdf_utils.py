@@ -4,6 +4,7 @@ mechanics are easy to read, explain, and tweak.
 """
 import glob
 import re
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -16,6 +17,12 @@ from pypdf import PdfReader
 # Below this many characters, we treat a page as "no usable text" and fall
 # back to OCR instead of indexing an empty/near-empty chunk.
 MIN_PAGE_TEXT_CHARS = 20
+
+# Checked once, not per-page — avoids spamming warnings for every page of
+# every manual when these simply aren't installed (common on Windows,
+# where neither ships by default; see README for install steps).
+_OCR_TOOLS_AVAILABLE = shutil.which("pdftoppm") is not None and shutil.which("tesseract") is not None
+_WARNED_MISSING_OCR = False
 
 
 class Chunk(NamedTuple):
@@ -58,40 +65,72 @@ def label_from_filename(filename: str) -> str:
     return f"{label} (Hindi)" if is_hindi else label
 
 
+_ocr_unavailable_warned = False
+
+
 def _ocr_page(pdf_path: Path, page_num: int) -> str:
     """
     Rasterizes a single page and runs Tesseract OCR on it. Used only as a
     fallback for pages with no embedded text layer (scanned manuals).
-    Requires poppler-utils (pdftoppm) and tesseract-ocr on PATH.
+    Requires poppler-utils (pdftoppm) and tesseract-ocr on PATH. If they're
+    not installed, this skips OCR quietly instead of crashing ingestion —
+    those specific pages just won't be indexed.
     """
+    global _ocr_unavailable_warned
     with tempfile.TemporaryDirectory() as tmp:
         prefix = str(Path(tmp) / "page")
-        subprocess.run(
-            ["pdftoppm", "-jpeg", "-r", "200", "-f", str(page_num), "-l", str(page_num),
-             str(pdf_path), prefix],
-            check=True, capture_output=True,
-        )
-        matches = glob.glob(f"{prefix}*.jpg")
-        if not matches:
+        try:
+            subprocess.run(
+                ["pdftoppm", "-jpeg", "-r", "200", "-f", str(page_num), "-l", str(page_num),
+                 str(pdf_path), prefix],
+                check=True, capture_output=True,
+            )
+            matches = glob.glob(f"{prefix}*.jpg")
+            if not matches:
+                return ""
+            result = subprocess.run(
+                ["tesseract", matches[0], "stdout"],
+                check=True, capture_output=True, text=True,
+            )
+            return result.stdout
+        except (FileNotFoundError, subprocess.CalledProcessError) as e:
+            if not _ocr_unavailable_warned:
+                print(f"    (OCR unavailable: {e}. Skipping OCR for pages with no text layer — "
+                      f"install Poppler + Tesseract if you need scanned-manual support.)")
+                _ocr_unavailable_warned = True
             return ""
-        result = subprocess.run(
-            ["tesseract", matches[0], "stdout"],
-            check=True, capture_output=True, text=True,
-        )
-        return result.stdout
 
 
 def extract_pages(pdf_path: Path, ocr_fallback: bool = True) -> List[str]:
     """
     Returns a list of page texts, index 0 = page 1. Pages with little or no
-    embedded text (scanned pages) are OCR'd instead, when ocr_fallback=True.
+    embedded text (scanned pages) are OCR'd instead, when ocr_fallback=True
+    and the OCR tools are actually available — otherwise those pages just
+    come back with whatever (possibly empty) text pypdf found, rather than
+    failing the whole run. See README for installing poppler/tesseract if
+    you want OCR working (mainly matters for scanned/image-only manuals).
     """
+    global _WARNED_MISSING_OCR
     reader = PdfReader(str(pdf_path))
     pages = []
     for i, page in enumerate(reader.pages, start=1):
         text = page.extract_text() or ""
-        if ocr_fallback and len(text.strip()) < MIN_PAGE_TEXT_CHARS:
-            text = _ocr_page(pdf_path, i)
+        needs_ocr = ocr_fallback and len(text.strip()) < MIN_PAGE_TEXT_CHARS
+
+        if needs_ocr and not _OCR_TOOLS_AVAILABLE:
+            if not _WARNED_MISSING_OCR:
+                print("  (note: poppler/tesseract not found — pages with no text layer "
+                      "will be skipped instead of OCR'd. See README for install steps.)")
+                _WARNED_MISSING_OCR = True
+            needs_ocr = False
+
+        if needs_ocr:
+            try:
+                text = _ocr_page(pdf_path, i)
+            except Exception as e:
+                print(f"    (OCR failed on {pdf_path.name} page {i}, skipping that page: {e})")
+                # fall through with whatever (possibly empty) text pypdf gave us
+
         pages.append(text)
     return pages
 
