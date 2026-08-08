@@ -27,8 +27,8 @@ CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "900"))       # characters
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "150")) # characters
 
 # --- Retrieval / generation ---
-TOP_K = int(os.getenv("TOP_K", "5"))
-MAX_ANSWER_TOKENS = int(os.getenv("MAX_ANSWER_TOKENS", "1024"))
+TOP_K = int(os.getenv("TOP_K", "8"))
+MAX_ANSWER_TOKENS = int(os.getenv("MAX_ANSWER_TOKENS", "2048"))
 
 # --- CORS ---
 # Comma-separated list of origins allowed to call this API in production.
