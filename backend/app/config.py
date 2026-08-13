@@ -13,6 +13,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent  # backend/
 # --- Gemini API ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
+# "latest" alias rather than a pinned version — Google has been restricting
+# access to specific pinned model names for newer API keys mid-project, so
+# the rolling alias is the more resilient choice here.
 GENERATION_MODEL = os.getenv("GENERATION_MODEL", "gemini-flash-latest")
 
 # --- Storage ---
@@ -28,7 +31,10 @@ CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "150")) # characters
 
 # --- Retrieval / generation ---
 TOP_K = int(os.getenv("TOP_K", "8"))
-MAX_ANSWER_TOKENS = int(os.getenv("MAX_ANSWER_TOKENS", "2048"))
+# Generous headroom: broad questions that touch many manuals can generate
+# long synthesized answers, and some Gemini model versions also spend part
+# of this budget on invisible "thinking" tokens before the visible answer.
+MAX_ANSWER_TOKENS = int(os.getenv("MAX_ANSWER_TOKENS", "8192"))
 
 # --- CORS ---
 # Comma-separated list of origins allowed to call this API in production.
@@ -48,7 +54,11 @@ rather than guessing.
 so and briefly note the difference per model instead of picking one silently.
 4. Always answer in the same language the question was asked in, even if the \
 excerpt you're citing is in a different language.
-5. Keep answers concise and practical. Use short steps or a short list for \
-instructions. Mention the manual/model and page for anything safety-related.
+5. Keep answers concise and practical. For broad questions that touch many \
+manuals, state shared/common guidance ONCE rather than repeating the same point \
+separately for every model — only break information out per model when models \
+genuinely differ on that specific point (e.g. an exact wait time or setting). \
+Use short steps or a short list for instructions. Mention the manual/model and \
+page for anything safety-related.
 6. Never invent a page number, model name, or error code that isn't present in \
 the excerpts."""
