@@ -17,12 +17,65 @@ function addUserMessage(text) {
   scrollToBottom();
 }
 
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderInline(line) {
+  line = line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  line = line.replace(/__(.+?)__/g, "<strong>$1</strong>");
+  line = line.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  line = line.replace(/(?<!\w)_(.+?)_(?!\w)/g, "<em>$1</em>");
+  return line;
+}
+
+function renderMarkdownLite(text) {
+  const lines = escapeHtml(text).split("\n");
+  let html = "";
+  let listType = null;
+
+  const closeList = () => {
+    if (listType) { html += listType === "ul" ? "</ul>" : "</ol>"; listType = null; }
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line === "") { closeList(); continue; }
+
+    const heading = line.match(/^#{1,6}\s+(.*)/);
+    const bullet = line.match(/^[-*•]\s+(.*)/);
+    const numbered = line.match(/^\d+\.\s+(.*)/);
+
+    if (heading) {
+      closeList();
+      html += `<div class="msg-heading">${renderInline(heading[1])}</div>`;
+    } else if (bullet) {
+      if (listType !== "ul") { closeList(); html += "<ul>"; listType = "ul"; }
+      html += `<li>${renderInline(bullet[1])}</li>`;
+    } else if (numbered) {
+      if (listType !== "ol") { closeList(); html += "<ol>"; listType = "ol"; }
+      html += `<li>${renderInline(numbered[1])}</li>`;
+    } else {
+      closeList();
+      html += `<p>${renderInline(line)}</p>`;
+    }
+  }
+  closeList();
+  return html;
+}
+
 function addAssistantMessage(text, sources, images) {
   const el = document.createElement("div");
   el.className = "msg msg-assistant";
-  const p = document.createElement("p");
-  p.textContent = text;
-  el.appendChild(p);
+  const contentEl = document.createElement("div");
+  contentEl.className = "msg-content";
+  contentEl.innerHTML = renderMarkdownLite(text);
+  el.appendChild(contentEl);
 
   if (images && images.length > 0) {
     const imagesEl = document.createElement("div");

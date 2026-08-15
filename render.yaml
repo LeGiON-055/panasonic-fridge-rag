@@ -14,10 +14,11 @@ services:
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
+    branch: deploy
     plan: free
     healthCheckPath: /api/health
     envVars:
       - key: GEMINI_API_KEY
         sync: false
       - key: ALLOWED_ORIGINS
-        value: "*"   # tighten to your deployed frontend's origin once you have it
+        value: "*"

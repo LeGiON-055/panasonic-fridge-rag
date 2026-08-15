@@ -2,9 +2,6 @@
 .env
 backend/.env
 
-# Generated vector index and extracted images (rebuild with `python -m app.ingest`)
-backend/vectorstore/
-backend/data/manual_images/
 
 # Manual PDFs are usually copyrighted by the manufacturer — this repo ships
 # the pipeline, not the manuals. Add your own to backend/data/manuals/
