@@ -58,5 +58,6 @@ def query(embedding: List[float], top_k: int, model_filter: Optional[str] = None
 def count() -> int:
     try:
         return get_collection().count()
-    except Exception:
+    except Exception as e:
+        print(f"    (vectorstore.count() failed: {type(e).__name__}: {e})")
         return 0
