@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -25,6 +27,16 @@ app.add_middleware(
 config.IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/images", StaticFiles(directory=str(config.IMAGES_DIR)), name="images")
 
+# Startup diagnostics — printed once when the server boots, visible in
+# Render's Logs tab (or your local terminal). Temporary, but worth keeping
+# until we've confirmed the deployed vector store is actually being found.
+print(f"Startup check: CHROMA_DIR = {config.CHROMA_DIR}")
+if config.CHROMA_DIR.exists():
+    print(f"  CHROMA_DIR exists. Contents: {os.listdir(config.CHROMA_DIR)}")
+else:
+    print("  CHROMA_DIR does NOT exist.")
+print(f"  chunks_indexed (via vectorstore.count()): {vectorstore_count()}")
+
 
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
@@ -44,7 +56,4 @@ def ask(request: AskRequest) -> AskResponse:
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        # Catches Gemini API errors (bad model name, quota, etc.) so the
-        # frontend gets a real error message instead of a raw 500 that
-        # CORS then hides behind a fake "can't reach backend" message.
         raise HTTPException(status_code=500, detail=f"Gemini API error: {e}")
