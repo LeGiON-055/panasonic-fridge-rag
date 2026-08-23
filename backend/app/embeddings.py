@@ -1,4 +1,4 @@
-"""
+﻿"""
 Embeddings via the Gemini API (gemini-embedding-001). Kept as the only
 place that knows about the embedding model, so swapping providers later
 means editing one file.
@@ -9,24 +9,23 @@ Loading a local transformer model comfortably blows that budget; calling
 an embedding API does not.
 
 Batching is deliberately conservative (small batches + a pause between
-them + retry-with-backoff on 429s) because the Gemini free tier allows
-only 100 embed_content requests/minute, and firing a big corpus at it
-without pacing trips that limit almost immediately.
+them + retry-with-backoff) because the Gemini free tier allows only 100
+embed_content requests/minute, and firing a big corpus at it without
+pacing trips that limit almost immediately. Retries cover both 429 (rate
+limit) and 503 ("high demand" / overloaded) -- the same pattern used in
+rag.py for the generation call, since both can happen on any given call.
 """
 import re
 import time
 from typing import List
 
 from google import genai
-from google.genai import types, errors
+from google.genai import types
 
 from app import config
 
 _client = None
 
-# Free-tier embed_content quota is 100 requests/minute. Small batches +
-# a pause between them keeps us comfortably under that without needing to
-# know the exact per-item accounting the API uses internally.
 DEFAULT_BATCH_SIZE = 10
 PAUSE_BETWEEN_BATCHES_SECONDS = 2.0
 MAX_RETRY_ATTEMPTS = 6
@@ -46,23 +45,30 @@ def _get_client() -> genai.Client:
 
 
 def _retry_delay_from_error(e: Exception) -> float:
-    """Gemini's 429 responses include a suggested retryDelay (e.g. '36s') —
-    use it if present, plus a small buffer, instead of guessing."""
     match = re.search(r"retryDelay['\"]?\s*:\s*['\"]?(\d+(?:\.\d+)?)s", str(e))
     if match:
         return float(match.group(1)) + 3.0
     return DEFAULT_RETRY_DELAY_SECONDS
 
 
+def _is_retryable(e: Exception) -> bool:
+    text = str(e)
+    return (
+        getattr(e, "code", None) in (429, 503)
+        or "RESOURCE_EXHAUSTED" in text
+        or "UNAVAILABLE" in text
+        or "high demand" in text.lower()
+    )
+
+
 def _embed_with_retry(client: genai.Client, **kwargs):
     for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):
         try:
             return client.models.embed_content(**kwargs)
-        except errors.ClientError as e:
-            is_rate_limit = getattr(e, "code", None) == 429 or "RESOURCE_EXHAUSTED" in str(e)
-            if is_rate_limit and attempt < MAX_RETRY_ATTEMPTS:
+        except Exception as e:
+            if _is_retryable(e) and attempt < MAX_RETRY_ATTEMPTS:
                 delay = _retry_delay_from_error(e)
-                print(f"    (rate limited by Gemini — waiting {delay:.0f}s "
+                print(f"    (Gemini temporarily unavailable -- waiting {delay:.0f}s "
                       f"before retrying, attempt {attempt}/{MAX_RETRY_ATTEMPTS})")
                 time.sleep(delay)
                 continue
@@ -70,7 +76,6 @@ def _embed_with_retry(client: genai.Client, **kwargs):
 
 
 def embed_documents(texts: List[str], batch_size: int = DEFAULT_BATCH_SIZE) -> List[List[float]]:
-    """Embeds manual chunks at ingestion time (task_type=RETRIEVAL_DOCUMENT)."""
     client = _get_client()
     vectors: List[List[float]] = []
     total_batches = (len(texts) + batch_size - 1) // batch_size
@@ -94,9 +99,6 @@ def embed_documents(texts: List[str], batch_size: int = DEFAULT_BATCH_SIZE) -> L
 
 
 def embed_query(text: str) -> List[float]:
-    """Embeds a user's question at query time (task_type=RETRIEVAL_QUERY —
-    Gemini optimizes query and document embeddings slightly differently for
-    retrieval, so it matters that this matches embed_documents)."""
     client = _get_client()
     result = _embed_with_retry(
         client,
