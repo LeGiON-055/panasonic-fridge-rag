@@ -1,4 +1,4 @@
-"""
+﻿"""
 Central configuration. Everything here can be overridden by environment
 variables (see .env.example) so nothing sensitive is hard-coded.
 """
@@ -13,10 +13,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent  # backend/
 # --- Gemini API ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
-# "latest" alias rather than a pinned version — Google has been restricting
-# access to specific pinned model names for newer API keys mid-project, so
-# the rolling alias is the more resilient choice here.
-GENERATION_MODEL = os.getenv("GENERATION_MODEL", "gemini-flash-latest")
+# Pinned rather than the "latest" rolling alias -- confirmed working for
+# this API key via test_models.py. A specific model version isn't affected
+# by demand spikes on whatever "latest" currently happens to resolve to.
+GENERATION_MODEL = os.getenv("GENERATION_MODEL", "gemini-3.1-flash-lite")
 
 # --- Storage ---
 MANUALS_DIR = Path(os.getenv("MANUALS_DIR", BASE_DIR / "data" / "manuals"))
@@ -31,14 +31,9 @@ CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "150")) # characters
 
 # --- Retrieval / generation ---
 TOP_K = int(os.getenv("TOP_K", "8"))
-# Generous headroom: broad questions that touch many manuals can generate
-# long synthesized answers, and some Gemini model versions also spend part
-# of this budget on invisible "thinking" tokens before the visible answer.
 MAX_ANSWER_TOKENS = int(os.getenv("MAX_ANSWER_TOKENS", "8192"))
 
 # --- CORS ---
-# Comma-separated list of origins allowed to call this API in production.
-# Defaults to "*" for local development only.
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 
 SYSTEM_PROMPT = """You are a support assistant that answers questions about \
@@ -56,7 +51,7 @@ so and briefly note the difference per model instead of picking one silently.
 excerpt you're citing is in a different language.
 5. Keep answers concise and practical. For broad questions that touch many \
 manuals, state shared/common guidance ONCE rather than repeating the same point \
-separately for every model — only break information out per model when models \
+separately for every model -- only break information out per model when models \
 genuinely differ on that specific point (e.g. an exact wait time or setting). \
 Use short steps or a short list for instructions. Mention the manual/model and \
 page for anything safety-related.
